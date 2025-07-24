@@ -12,36 +12,42 @@
   --font-special: 'Pacifico', cursive;
 
   /* Day mode color scheme */
-  --color-bg: #f7f7fa;
+  --color-bg: #f5f7fa;
   --color-fg: #18181b;
-  --color-accent: #0d6efd;
-  --color-toolbar: #eaeaea;
+  --color-accent: #2563eb;
+  --color-toolbar: #f1f5f9;
   --color-canvas: #fff;
-  --color-btn: #444;
+  --color-btn: #2563eb;
+  --color-btn-hover: #1d4ed8;
   --color-btn-active: #0d6efd;
   --color-btn-text: #fff;
-  --color-border: #d1d5db;
-  --color-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  --color-border: #e5e7eb;
+  --color-shadow: 0 4px 24px rgba(0,0,0,0.08);
 
   --color-highlight: #ffe066;
   --color-special: #ff6f61;
+  --radius: 12px;
+  --transition: 0.18s cubic-bezier(.4,0,.2,1);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --color-bg: #18181b;
     --color-fg: #f7f7fa;
-    --color-accent: #0d6efd;
+    --color-accent: #60a5fa;
     --color-toolbar: #23232a;
-    --color-canvas: #222;
-    --color-btn: #333;
-    --color-btn-active: #0d6efd;
+    --color-canvas: #23232a;
+    --color-btn: #2563eb;
+    --color-btn-hover: #1d4ed8;
+    --color-btn-active: #60a5fa;
     --color-btn-text: #fff;
     --color-border: #333;
-    --color-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    --color-shadow: 0 4px 24px rgba(0,0,0,0.25);
 
     --color-highlight: #3ec6e0;
     --color-special: #e67cff;
+    --radius: 12px;
+    --transition: 0.18s cubic-bezier(.4,0,.2,1);
   }
 }
 
@@ -49,17 +55,20 @@
 .dark {
   --color-bg: #18181b;
   --color-fg: #f7f7fa;
-  --color-accent: #0d6efd;
+  --color-accent: #60a5fa;
   --color-toolbar: #23232a;
-  --color-canvas: #222;
-  --color-btn: #333;
-  --color-btn-active: #0d6efd;
+  --color-canvas: #23232a;
+  --color-btn: #2563eb;
+  --color-btn-hover: #1d4ed8;
+  --color-btn-active: #60a5fa;
   --color-btn-text: #fff;
   --color-border: #333;
-  --color-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  --color-shadow: 0 4px 24px rgba(0,0,0,0.25);
 
   --color-highlight: #3ec6e0;
   --color-special: #e67cff;
+  --radius: 12px;
+  --transition: 0.18s cubic-bezier(.4,0,.2,1);
 }
 
 html, body {
@@ -69,51 +78,91 @@ html, body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  transition: background 0.3s, color 0.3s;
+  transition: background var(--transition), color var(--transition);
 }
 
 h1, .title {
   font-family: var(--font-title);
   color: var(--color-accent);
   letter-spacing: 2px;
+  font-size: 2.2rem;
+  margin-bottom: 0.5em;
 }
 
 .special-word {
   font-family: var(--font-special);
   color: var(--color-special);
   background: var(--color-highlight);
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 1.1em;
+  padding: 2px 10px;
+  border-radius: 8px;
+  font-size: 1.15em;
+  letter-spacing: 1px;
 }
 
 button, select, input[type="color"], input[type="range"], input[type="number"] {
   background: var(--color-btn);
   color: var(--color-btn-text);
   border: none;
-  padding: 6px 12px;
-  border-radius: 5px;
+  padding: 10px 18px;
+  border-radius: var(--radius);
   font-family: var(--font-main);
   font-size: 1rem;
-  margin-right: 4px;
+  margin-right: 8px;
   box-shadow: var(--color-shadow);
-  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+  transition: background var(--transition), color var(--transition), box-shadow var(--transition), transform var(--transition);
+  outline: none;
+  cursor: pointer;
+  font-weight: 500;
+}
+button:hover, select:hover, input[type="color"]:hover, input[type="range"]:hover, input[type="number"]:hover {
+  background: var(--color-btn-hover);
+  color: #fff;
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 8px 32px rgba(37,99,235,0.10);
 }
 button:active {
   background: var(--color-btn-active);
   color: #fff;
+  transform: scale(0.98);
 }
 button[disabled] {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
 .toolbar {
   background: var(--color-toolbar);
   box-shadow: var(--color-shadow);
+  border-radius: var(--radius);
+  padding: 18px 24px;
+  margin: 24px auto 16px auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 900px;
 }
+
 .drawing-canvas {
   background: var(--color-canvas);
   border: 2px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   box-shadow: var(--color-shadow);
+  margin: 0 auto;
+  display: block;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+input[type="range"] {
+  accent-color: var(--color-accent);
+  height: 4px;
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  background: var(--color-toolbar);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-accent);
+  border-radius: 8px;
 }
