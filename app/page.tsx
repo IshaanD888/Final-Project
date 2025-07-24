@@ -6,46 +6,25 @@ import React, {
   useCallback,
 
 } from "react";
-import { ButtonSoundContext } from "./useButtonSound";
 
-type Point = { x: number; y: number };
-type DrawType = "pencil" | "eraser" | "select" | "shape";
-type ShapeType = "rectangle" | "circle" | "triangle";
-type PathObj = {
-  type: "path";
-  points: Point[];
-  size: number;
-  color: string;
-  opacity: number;
-  isEraser?: boolean;
-};
-type ShapeObj = {
-  type: "shape";
-  shape: ShapeType;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  color: string;
-  opacity: number;
-};
-type DrawObj = PathObj | ShapeObj;
-
-// --- Sound Context (moved from layout.tsx) ---
+const COLORS = ["#e74c3c", "#27ae60", "#f1c40f", "#3498db"];
 
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
 
   // UI state
+  const [night, setNight] = useState(false);
   const [tool, setTool] = useState<DrawType>("pencil");
   const [color, setColor] = useState("#000000");
   const [size, setSize] = useState(5);
   const [opacity, setOpacity] = useState(1);
+  const [font, setFont] = useState("sans-serif");
   const [shapeType, setShapeType] = useState<ShapeType>("rectangle");
   const [shapeW, setShapeW] = useState(100);
   const [shapeH, setShapeH] = useState(60);
-  const [theme, setTheme] = useState("light");
+  const [history, setHistory] = useState<DrawObj[][]>([]);
+  const [redoStack, setRedoStack] = useState<DrawObj[][]>([]);
 
   // Drawing state
   const [objects, setObjects] = useState<DrawObj[]>([]);
@@ -53,12 +32,9 @@ export default function Home() {
   const [drawing, setDrawing] = useState(false);
   const [start, setStart] = useState<Point>({ x: 0, y: 0 });
 
-  const [history, setHistory] = useState<DrawObj[][]>([]);
-  const [redoStack, setRedoStack] = useState<DrawObj[][]>([]);
-
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-  }, [theme]);
+    document.documentElement.setAttribute("data-theme", night ? "dark" : "light");
+  }, [night]);
 
   // Redraw on objects/selected/tool change
   useEffect(() => {
@@ -339,55 +315,79 @@ export default function Home() {
     setSelected(selected - 1);
   }
 
-  // You can use your own sound file here (public/click.mp3)
+  // Play click sound
   const playSound = () => {
-    const audio = new Audio("/click.mp3");
-    audio.volume = 0.2;
-    audio.play();
+    const audio = document.getElementById("clickSound") as HTMLAudioElement;
+    if (audio) {
+      audio.currentTime = 0;
+      audio.play();
+    }
   };
 
   // Toolbar
   return (
-    <ButtonSoundContext.Provider value={playSound}>
-      <div className={`drawing-app-root ${theme}`}>
-        <div
-          ref={toolbarRef}
-          className="toolbar"
-          onClick={(e) => {
-            const target = e.target as HTMLElement;
-            if (target.tagName === "BUTTON") playSound();
-          }}
-        >
-          <button
-            style={{ background: tool === "pencil" ? "#0d6efd" : undefined }}
-            onClick={() => setTool("pencil")}
-          >
-            Pencil
-          </button>
-          <button
-            style={{ background: tool === "eraser" ? "#0d6efd" : undefined }}
-            onClick={() => setTool("eraser")}
-          >
-            Eraser
-          </button>
-          <button
-            style={{ background: tool === "select" ? "#0d6efd" : undefined }}
-            onClick={() => setTool("select")}
-          >
-            Select
-          </button>
-          <button
-            style={{ background: tool === "shape" ? "#0d6efd" : undefined }}
-            onClick={() => setTool("shape")}
-          >
-            Shape
-          </button>
-          <label>
-            Color:{" "}
-            <input
-              type="color"
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
+    <div className={night ? "night" : ""} style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <div
+        ref={toolbarRef}
+        id="toolbar"
+        style={{ zIndex: 2 }}
+        onClick={(e) => {
+          const target = e.target as HTMLElement;
+          if (target.tagName === "BUTTON") playSound();
+        }}
+      >
+        <button className={tool === "pencil" ? "active" : ""} onClick={() => setTool("pencil")}>Pencil</button>
+        <button className={tool === "line" ? "active" : ""} onClick={() => setTool("line")}>Line</button>
+        <button className={tool === "select" ? "active" : ""} onClick={() => setTool("select")}>Select</button>
+        <button className={tool === "eraser" ? "active" : ""} onClick={() => setTool("eraser")}>Eraser</button>
+        <button className={tool === "text" ? "active" : ""} onClick={() => setTool("text")}>Text</button>
+        <select value={font} onChange={e => { setFont(e.target.value); playSound(); }}>
+          <option value="sans-serif">Sans</option>
+          <option value="serif">Serif</option>
+          <option value="monospace">Mono</option>
+          <option value="cursive">Cursive</option>
+        </select>
+        <div id="colorPalette" style={{ display: "inline-flex", alignItems: "center" }}>
+          <span className="labelText">Color:</span>
+          <input type="color" value={color} onChange={e => { setColor(e.target.value); playSound(); }} />
+          {COLORS.map((c) => (
+            <button key={c} style={{ background: c }} onClick={() => handleColor(c)} data-color={c} />
+          ))}
+        </div>
+        <label><span className="labelText">Size:</span>
+          <input type="range" min={1} max={30} value={size} onChange={e => { setSize(Number(e.target.value)); playSound(); }} />
+        </label>
+        <label><span className="labelText">Opacity:</span>
+          <input type="range" min={0.1} max={1} step={0.1} value={opacity} onChange={e => { setOpacity(Number(e.target.value)); playSound(); }} />
+        </label>
+        <label>
+          Shape:
+          <select value={shapeType} onChange={e => setShapeType(e.target.value as ShapeType)}>
+            <option value="rectangle">Rectangle</option>
+            <option value="circle">Circle</option>
+            <option value="triangle">Triangle</option>
+          </select>
+        </label>
+        <label>W: <input type="number" min={10} value={shapeW} onChange={e => setShapeW(Number(e.target.value))} style={{ width: 60 }} /></label>
+        <label>H: <input type="number" min={10} value={shapeH} onChange={e => setShapeH(Number(e.target.value))} style={{ width: 60 }} /></label>
+        <button onClick={handleShape}>Add Shape</button>
+        <button id="nightBtn" onClick={toggleNight}>{night ? "☀️ Day Mode" : "🌙 Night Mode"}</button>
+      </div>
+      <div className="canvas-container">
+        <canvas
+          ref={canvasRef}
+          id="canvas"
+          style={{ flex: 1, width: "100vw", display: "block", borderTop: "2px solid #aaa" }}
+          onMouseDown={handlePointerDown}
+          onMouseMove={handlePointerMove}
+          onMouseUp={handlePointerUp}
+          onTouchStart={handlePointerDown}
+          onTouchMove={handlePointerMove}
+          onTouchEnd={handlePointerUp}
+        />
+      </div>
+      {/* Embedded click sound */}
+      <audio id="clickSound" preload="auto">
               disabled={tool === "eraser"}
             />
           </label>
