@@ -1,5 +1,12 @@
 "use client";
-import React, { useRef, useEffect, useState, useCallback } from "react";
+import React, {
+  useRef,
+  useEffect,
+  useState,
+  useCallback,
+
+} from "react";
+import { ButtonSoundContext } from "./useButtonSound";
 
 type Point = { x: number; y: number };
 type DrawType = "pencil" | "eraser" | "select" | "shape";
@@ -23,6 +30,8 @@ type ShapeObj = {
   opacity: number;
 };
 type DrawObj = PathObj | ShapeObj;
+
+// --- Sound Context (moved from layout.tsx) ---
 
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -50,26 +59,6 @@ export default function Home() {
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
-
-  // Resize canvas on window resize/orientation change
-  useEffect(() => {
-    function resizeCanvas() {
-      const canvas = canvasRef.current;
-      const toolbar = toolbarRef.current;
-      if (canvas && toolbar) {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight - toolbar.offsetHeight;
-        redraw();
-      }
-    }
-    window.addEventListener("resize", resizeCanvas);
-    window.addEventListener("orientationchange", resizeCanvas);
-    resizeCanvas();
-    return () => {
-      window.removeEventListener("resize", resizeCanvas);
-      window.removeEventListener("orientationchange", resizeCanvas);
-    };
-  }, []);
 
   // Redraw on objects/selected/tool change
   useEffect(() => {
@@ -144,6 +133,26 @@ export default function Home() {
       }
     });
   }, [objects, selected, tool]);
+
+  // Resize canvas on window resize/orientation change
+  useEffect(() => {
+    function resizeCanvas() {
+      const canvas = canvasRef.current;
+      const toolbar = toolbarRef.current;
+      if (canvas && toolbar) {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight - toolbar.offsetHeight;
+        redraw();
+      }
+    }
+    window.addEventListener("resize", resizeCanvas);
+    window.addEventListener("orientationchange", resizeCanvas);
+    resizeCanvas();
+    return () => {
+      window.removeEventListener("resize", resizeCanvas);
+      window.removeEventListener("orientationchange", resizeCanvas);
+    };
+  }, [redraw]);
 
   // Unified pointer event handler
   function getPointerFromEvent(e: React.MouseEvent | React.TouchEvent): Point {
@@ -330,211 +339,227 @@ export default function Home() {
     setSelected(selected - 1);
   }
 
+  // You can use your own sound file here (public/click.mp3)
+  const playSound = () => {
+    const audio = new Audio("/click.mp3");
+    audio.volume = 0.2;
+    audio.play();
+  };
+
   // Toolbar
   return (
-    <div className="drawing-app-root">
-      <div ref={toolbarRef} className="toolbar">
-        <button
-          style={{ background: tool === "pencil" ? "#0d6efd" : undefined }}
-          onClick={() => setTool("pencil")}
-        >
-          Pencil
-        </button>
-        <button
-          style={{ background: tool === "eraser" ? "#0d6efd" : undefined }}
-          onClick={() => setTool("eraser")}
-        >
-          Eraser
-        </button>
-        <button
-          style={{ background: tool === "select" ? "#0d6efd" : undefined }}
-          onClick={() => setTool("select")}
-        >
-          Select
-        </button>
-        <button
-          style={{ background: tool === "shape" ? "#0d6efd" : undefined }}
-          onClick={() => setTool("shape")}
-        >
-          Shape
-        </button>
-        <label>
-          Color:{" "}
-          <input
-            type="color"
-            value={color}
-            onChange={(e) => setColor(e.target.value)}
-            disabled={tool === "eraser"}
-          />
-        </label>
-        <label>
-          Size:{" "}
-          <input
-            type="range"
-            min={1}
-            max={30}
-            value={size}
-            onChange={(e) => setSize(Number(e.target.value))}
-          />
-        </label>
-        <label>
-          Opacity:{" "}
-          <input
-            type="range"
-            min={0.1}
-            max={1}
-            step={0.1}
-            value={opacity}
-            onChange={(e) => setOpacity(Number(e.target.value))}
-          />
-        </label>
-        {tool === "shape" && (
-          <>
-            <select
-              value={shapeType}
-              onChange={(e) => setShapeType(e.target.value as ShapeType)}
+    <ButtonSoundContext.Provider value={playSound}>
+      <div
+        onClick={(e) => {
+          const target = e.target as HTMLElement;
+          if (target.tagName === "BUTTON") playSound();
+        }}
+      >
+        <div className="drawing-app-root">
+          <div ref={toolbarRef} className="toolbar">
+            <button
+              style={{ background: tool === "pencil" ? "#0d6efd" : undefined }}
+              onClick={() => setTool("pencil")}
             >
-              <option value="rectangle">Rectangle</option>
-              <option value="circle">Circle</option>
-              <option value="triangle">Triangle</option>
-            </select>
+              Pencil
+            </button>
+            <button
+              style={{ background: tool === "eraser" ? "#0d6efd" : undefined }}
+              onClick={() => setTool("eraser")}
+            >
+              Eraser
+            </button>
+            <button
+              style={{ background: tool === "select" ? "#0d6efd" : undefined }}
+              onClick={() => setTool("select")}
+            >
+              Select
+            </button>
+            <button
+              style={{ background: tool === "shape" ? "#0d6efd" : undefined }}
+              onClick={() => setTool("shape")}
+            >
+              Shape
+            </button>
             <label>
-              W:{" "}
+              Color:{" "}
               <input
-                type="number"
-                min={10}
-                value={shapeW}
-                onChange={(e) => setShapeW(Number(e.target.value))}
-                style={{ width: 50 }}
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                disabled={tool === "eraser"}
               />
             </label>
             <label>
-              H:{" "}
+              Size:{" "}
               <input
-                type="number"
-                min={10}
-                value={shapeH}
-                onChange={(e) => setShapeH(Number(e.target.value))}
-                style={{ width: 50 }}
+                type="range"
+                min={1}
+                max={30}
+                value={size}
+                onChange={(e) => setSize(Number(e.target.value))}
               />
             </label>
-          </>
-        )}
-        <button onClick={handleUndo} disabled={history.length === 0}>
-          Undo
-        </button>
-        <button onClick={handleRedo} disabled={redoStack.length === 0}>
-          Redo
-        </button>
-        <button onClick={handleClear}>Clear</button>
-        <button onClick={handleExport}>Export PNG</button>
-        <button onClick={handleDelete} disabled={selected === null}>
-          Delete
-        </button>
-        <button
-          onClick={handleBringForward}
-          disabled={selected === null || selected === objects.length - 1}
-        >
-          Bring Forward
-        </button>
-        <button
-          onClick={handleSendBackward}
-          disabled={selected === null || selected === 0}
-        >
-          Send Backward
-        </button>
-        <button onClick={() => setTheme(theme === "light" ? "dark" : "light")}>
-          {theme === "light" ? "🌙 Night" : "☀️ Day"}
-        </button>
+            <label>
+              Opacity:{" "}
+              <input
+                type="range"
+                min={0.1}
+                max={1}
+                step={0.1}
+                value={opacity}
+                onChange={(e) => setOpacity(Number(e.target.value))}
+              />
+            </label>
+            {tool === "shape" && (
+              <>
+                <select
+                  value={shapeType}
+                  onChange={(e) => setShapeType(e.target.value as ShapeType)}
+                >
+                  <option value="rectangle">Rectangle</option>
+                  <option value="circle">Circle</option>
+                  <option value="triangle">Triangle</option>
+                </select>
+                <label>
+                  W:{" "}
+                  <input
+                    type="number"
+                    min={10}
+                    value={shapeW}
+                    onChange={(e) => setShapeW(Number(e.target.value))}
+                    style={{ width: 50 }}
+                  />
+                </label>
+                <label>
+                  H:{" "}
+                  <input
+                    type="number"
+                    min={10}
+                    value={shapeH}
+                    onChange={(e) => setShapeH(Number(e.target.value))}
+                    style={{ width: 50 }}
+                  />
+                </label>
+              </>
+            )}
+            <button onClick={handleUndo} disabled={history.length === 0}>
+              Undo
+            </button>
+            <button onClick={handleRedo} disabled={redoStack.length === 0}>
+              Redo
+            </button>
+            <button onClick={handleClear}>Clear</button>
+            <button onClick={handleExport}>Export PNG</button>
+            <button onClick={handleDelete} disabled={selected === null}>
+              Delete
+            </button>
+            <button
+              onClick={handleBringForward}
+              disabled={selected === null || selected === objects.length - 1}
+            >
+              Bring Forward
+            </button>
+            <button
+              onClick={handleSendBackward}
+              disabled={selected === null || selected === 0}
+            >
+              Send Backward
+            </button>
+            <button onClick={() => setTheme(theme === "light" ? "dark" : "light")}>
+              {theme === "light" ? "🌙 Night" : "☀️ Day"}
+            </button>
+          </div>
+          <div className="canvas-container">
+            <canvas
+              ref={canvasRef}
+              className="drawing-canvas"
+              width={typeof window !== "undefined" ? window.innerWidth : 800}
+              height={
+                typeof window !== "undefined"
+                  ? window.innerHeight - (toolbarRef.current?.offsetHeight || 60)
+                  : 600
+              }
+              onMouseDown={handlePointerDown}
+              onMouseMove={handlePointerMove}
+              onMouseUp={handlePointerUp}
+              onTouchStart={handlePointerDown}
+              onTouchMove={handlePointerMove}
+              onTouchEnd={handlePointerUp}
+            />
+          </div>
+          <style jsx global>{`
+            .drawing-app-root {
+              height: 100vh;
+              background: #222;
+              color: #fff;
+              display: grid;
+              grid-template-columns: repeat(3, 1fr);
+              grid-template-rows: auto 1fr;
+              gap: 0;
+            }
+            .toolbar {
+              grid-column: 1 / span 3;
+              background: #333;
+              padding: 10px;
+              display: flex;
+              flex-wrap: wrap;
+              gap: 10px;
+              align-items: center;
+            }
+            .canvas-container {
+              grid-column: 1 / span 3;
+              width: 100%;
+              height: 100%;
+              background: #111;
+            }
+            .drawing-canvas {
+              display: block;
+              background: #fff;
+              cursor: crosshair;
+              width: 100vw;
+              height: 100%;
+              touch-action: none;
+            }
+            @media (max-width: 1099px) {
+              .drawing-app-root {
+                grid-template-columns: repeat(2, 1fr);
+              }
+              .toolbar, .canvas-container {
+                grid-column: 1 / span 2;
+              }
+            }
+            @media (max-width: 699px) {
+              .drawing-app-root {
+                grid-template-columns: 1fr;
+              }
+              .toolbar, .canvas-container {
+                grid-column: 1 / span 1;
+              }
+            }
+            button,
+            select,
+            input[type="color"],
+            input[type="range"],
+            input[type="number"] {
+              background: #444;
+              color: #fff;
+              border: none;
+              padding: 5px;
+              border-radius: 4px;
+              cursor: pointer;
+              transition: transform 0.1s ease;
+            }
+            button:active {
+              transform: scale(0.95);
+            }
+            button[disabled] {
+              opacity: 0.5;
+              cursor: not-allowed;
+            }
+          `}</style>
+        </div>
       </div>
-      <div className="canvas-container">
-        <canvas
-          ref={canvasRef}
-          className="drawing-canvas"
-          width={typeof window !== "undefined" ? window.innerWidth : 800}
-          height={
-            typeof window !== "undefined"
-              ? window.innerHeight - (toolbarRef.current?.offsetHeight || 60)
-              : 600
-          }
-          onMouseDown={handlePointerDown}
-          onMouseMove={handlePointerMove}
-          onMouseUp={handlePointerUp}
-          onTouchStart={handlePointerDown}
-          onTouchMove={handlePointerMove}
-          onTouchEnd={handlePointerUp}
-        />
-      </div>
-      <style jsx global>{`
-        .drawing-app-root {
-          height: 100vh;
-          background: #222;
-          color: #fff;
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          grid-template-rows: auto 1fr;
-          gap: 0;
-        }
-        .toolbar {
-          grid-column: 1 / span 3;
-          background: #333;
-          padding: 10px;
-          display: flex;
-          flex-wrap: wrap;
-          gap: 10px;
-          align-items: center;
-        }
-        .canvas-container {
-          grid-column: 1 / span 3;
-          width: 100%;
-          height: 100%;
-          background: #111;
-        }
-        .drawing-canvas {
-          display: block;
-          background: #fff;
-          cursor: crosshair;
-          width: 100vw;
-          height: 100%;
-          touch-action: none;
-        }
-        @media (max-width: 1099px) {
-          .drawing-app-root {
-            grid-template-columns: repeat(2, 1fr);
-          }
-          .toolbar, .canvas-container {
-            grid-column: 1 / span 2;
-          }
-        }
-        @media (max-width: 699px) {
-          .drawing-app-root {
-            grid-template-columns: 1fr;
-          }
-          .toolbar, .canvas-container {
-            grid-column: 1 / span 1;
-          }
-        }
-        button,
-        select,
-        input[type="color"],
-        input[type="range"],
-        input[type="number"] {
-          background: #444;
-          color: #fff;
-          border: none;
-          padding: 5px;
-          border-radius: 4px;
-          cursor: pointer;
-          transition: transform 0.1s ease;
-        }
-        button:active {
-          transform: scale(0.95);
-        }
-        button[disabled] {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-      `}</style>
-    </div>
+    </ButtonSoundContext.Provider>
   );
 }
