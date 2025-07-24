@@ -5,6 +5,10 @@
 :root {
   --font-main: var(--font-geist-sans), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), monospace;
+  --font-title: 'Bebas Neue', Impact, sans-serif;      /* NEW: For titles/headings */
+  --font-special: 'Pacifico', cursive;                 /* NEW: For special words */
+
+  /* Day mode color scheme */
   --color-bg: #f7f7fa;
   --color-fg: #18181b;
   --color-accent: #0d6efd;
@@ -15,10 +19,15 @@
   --color-btn-text: #fff;
   --color-border: #d1d5db;
   --color-shadow: 0 2px 8px rgba(0,0,0,0.07);
+
+  /* Unique day mode colors */
+  --color-highlight: #ffe066;
+  --color-special: #ff6f61;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
+    /* Night mode color scheme */
     --color-bg: #18181b;
     --color-fg: #f7f7fa;
     --color-accent: #0d6efd;
@@ -29,8 +38,15 @@
     --color-btn-text: #fff;
     --color-border: #333;
     --color-shadow: 0 2px 8px rgba(0,0,0,0.25);
+
+    /* Unique night mode colors */
+    --color-highlight: #3ec6e0;
+    --color-special: #e67cff;
   }
 }
+
+/* Import Google Fonts for new font families */
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Pacifico&display=swap');
 
 html, body {
   font-family: var(--font-main);
@@ -42,10 +58,20 @@ html, body {
   transition: background 0.3s, color 0.3s;
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+/* Example usage for special fonts and colors */
+h1, .title {
+  font-family: var(--font-title);
+  color: var(--color-accent);
+  letter-spacing: 2px;
+}
+
+.special-word {
+  font-family: var(--font-special);
+  color: var(--color-special);
+  background: var(--color-highlight);
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 1.1em;
 }
 
 button, select, input[type="color"], input[type="range"], input[type="number"] {
