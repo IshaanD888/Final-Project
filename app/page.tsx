@@ -1,101 +1,528 @@
-import Image from "next/image";
+"use client";
+import React, { useRef, useEffect, useState } from "react";
+
+type Point = { x: number; y: number };
+type PathObj = {
+  type: "path";
+  points: Point[];
+  size: number;
+  color: string;
+  opacity: number;
+};
+type LineObj = {
+  type: "line";
+  points: [Point, Point];
+  size: number;
+  color: string;
+  opacity: number;
+};
+type ShapeObj = {
+  type: "shape";
+  shape: "rectangle" | "circle" | "triangle";
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  size: number;
+  color: string;
+  opacity: number;
+};
+type DrawObj = PathObj | LineObj | ShapeObj;
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+  // Drawing state
+  const [tool, setTool] = useState<"pencil" | "line" | "select">("pencil");
+  const [brushSize, setBrushSize] = useState(5);
+  const [brushColor, setBrushColor] = useState("#000000");
+  const [brushOpacity, setBrushOpacity] = useState(1);
+  const [shape, setShape] = useState("");
+  const [shapeW, setShapeW] = useState(100);
+  const [shapeH, setShapeH] = useState(60);
+
+  // Drawing logic state
+  const [objects, setObjects] = useState<DrawObj[]>([]);
+  const [history, setHistory] = useState<string[]>([]);
+  const [selected, setSelected] = useState<DrawObj | null>(null);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [confirmMove, setConfirmMove] = useState(false);
+  const [drawing, setDrawing] = useState(false);
+  const [dragged, setDragged] = useState(false);
+  const [start, setStart] = useState({ x: 0, y: 0 });
+
+  // Resize canvas on window resize
+  useEffect(() => {
+    function resizeCanvas() {
+      const canvas = canvasRef.current;
+      const toolbar = toolbarRef.current;
+      if (canvas && toolbar) {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight - toolbar.offsetHeight;
+        redraw();
+      }
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+    return () => window.removeEventListener("resize", resizeCanvas);
+    // eslint-disable-next-line
+  }, []);
+
+  // Redraw on objects/selected/confirmMove change
+  useEffect(() => {
+    redraw();
+    // eslint-disable-next-line
+  }, [objects, selected, confirmMove]);
+
+  // Drawing helpers
+  function saveHistory() {
+    setHistory((h) => [...h, JSON.stringify(objects)]);
+  }
+  function undo() {
+    setHistory((h) => {
+      if (h.length) {
+        setObjects(JSON.parse(h[h.length - 1]));
+        setSelected(null);
+        setConfirmMove(false);
+        return h.slice(0, -1);
+      }
+      return h;
+    });
+  }
+  function redraw() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    objects.forEach((obj) => drawObject(ctx, obj));
+    if (selected) {
+      const x = getX(selected),
+        y = getY(selected),
+        w = getW(selected),
+        h = getH(selected);
+      ctx.globalAlpha = 1;
+      ctx.setLineDash([5, 5]);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = confirmMove ? "lime" : "red";
+      ctx.strokeRect(x, y, w, h);
+      ctx.setLineDash([]);
+    }
+  }
+  function drawObject(ctx: CanvasRenderingContext2D, obj: DrawObj) {
+    ctx.globalAlpha = obj.opacity;
+    ctx.lineWidth = obj.size;
+    ctx.strokeStyle = obj.color;
+    ctx.fillStyle = obj.color;
+    if (obj.type === "path") {
+      ctx.beginPath();
+      ctx.moveTo(obj.points[0].x, obj.points[0].y);
+      obj.points.forEach((p, i) => i > 0 && ctx.lineTo(p.x, p.y));
+      ctx.stroke();
+    } else if (obj.type === "line") {
+      ctx.beginPath();
+      ctx.moveTo(obj.points[0].x, obj.points[0].y);
+      ctx.lineTo(obj.points[1].x, obj.points[1].y);
+      ctx.stroke();
+    } else if (obj.type === "shape") {
+      ctx.beginPath();
+      if (obj.shape === "rectangle") {
+        ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
+      } else if (obj.shape === "circle") {
+        ctx.arc(
+          obj.x + obj.w / 2,
+          obj.y + obj.h / 2,
+          Math.min(obj.w, obj.h) / 2,
+          0,
+          2 * Math.PI
+        );
+        ctx.fill();
+      } else if (obj.shape === "triangle") {
+        ctx.moveTo(obj.x + obj.w / 2, obj.y);
+        ctx.lineTo(obj.x, obj.y + obj.h);
+        ctx.lineTo(obj.x + obj.w, obj.y + obj.h);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+  }
+  function isHit(o: DrawObj, x: number, y: number): boolean {
+    const ox = getX(o),
+      oy = getY(o),
+      w = getW(o),
+      h = getH(o);
+    return (
+      typeof ox === "number" &&
+      typeof oy === "number" &&
+      typeof w === "number" &&
+      typeof h === "number" &&
+      x >= ox &&
+      x <= ox + w &&
+      y >= oy &&
+      y <= oy + h
+    );
+  }
+  function getX(o: DrawObj): number {
+    if (o.type === "path") return Math.min(...o.points.map((p) => p.x));
+    if (o.type === "line") return Math.min(o.points[0].x, o.points[1].x);
+    if ("x" in o) return o.x;
+    return 0;
+  }
+  function getY(o: DrawObj): number {
+    if (o.type === "path") return Math.min(...o.points.map((p) => p.y));
+    if (o.type === "line") return Math.min(o.points[0].y, o.points[1].y);
+    if ("y" in o) return o.y;
+    return 0;
+  }
+  function getW(o: DrawObj): number {
+    if (o.type === "path")
+      return Math.max(...o.points.map((p) => p.x)) - getX(o);
+    if (o.type === "line") return Math.abs(o.points[1].x - o.points[0].x);
+    if ("w" in o) return o.w;
+    return 0;
+  }
+  function getH(o: DrawObj): number {
+    if (o.type === "path")
+      return Math.max(...o.points.map((p) => p.y)) - getY(o);
+    if (o.type === "line") return Math.abs(o.points[1].y - o.points[0].y);
+    if ("h" in o) return o.h;
+    return 0;
+  }
+  function shift(o: DrawObj, dx: number, dy: number) {
+    if (o.type === "path" || o.type === "line") {
+      o.points = o.points.map((p) => ({ x: p.x + dx, y: p.y + dy }));
+    } else {
+      o.x += dx;
+      o.y += dy;
+    }
+  }
+
+  // Mouse events
+  function handleMouseDown(e: React.MouseEvent) {
+    const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setStart({ x, y });
+    setDragged(false);
+    setConfirmMove(false);
+
+    if (tool === "select") {
+      for (let i = objects.length - 1; i >= 0; i--) {
+        if (isHit(objects[i], x, y)) {
+          setSelected(objects[i]);
+          setOffset({ x: x - getX(objects[i]), y: y - getY(objects[i]) });
+          setConfirmMove(false);
+          return;
+        }
+      }
+    } else {
+      saveHistory();
+      setDrawing(true);
+      setSelected(null);
+      if (tool === "pencil") {
+        setObjects((objs) => [
+          ...objs,
+          {
+            type: "path",
+            points: [{ x, y }],
+            size: brushSize,
+            color: brushColor,
+            opacity: brushOpacity,
+          },
+        ]);
+      } else if (tool === "line") {
+        setObjects((objs) => [
+          ...objs,
+          {
+            type: "line",
+            points: [
+              { x, y },
+              { x, y },
+            ],
+            size: brushSize,
+            color: brushColor,
+            opacity: brushOpacity,
+          },
+        ]);
+      }
+    }
+  }
+  function handleMouseMove(e: React.MouseEvent) {
+    const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    if (tool === "select" && selected && !confirmMove) {
+      setDragged(true);
+      const dx = x - offset.x - getX(selected);
+      const dy = y - offset.y - getY(selected);
+      setObjects((objs) =>
+        objs.map((obj) =>
+          obj === selected
+            ? (() => {
+                const copy = JSON.parse(JSON.stringify(obj));
+                shift(copy, dx, dy);
+                return copy;
+              })()
+            : obj
+        )
+      );
+    } else if (drawing) {
+      setObjects((objs) => {
+        const newObjs = [...objs];
+        const obj = newObjs[newObjs.length - 1];
+        if (!obj) return newObjs;
+        if (obj.type === "path") {
+          obj.points = [...obj.points, { x, y }];
+        } else if (obj.type === "line") {
+          obj.points = [obj.points[0], { x, y }];
+        }
+        newObjs[newObjs.length - 1] = obj;
+        return newObjs;
+      });
+    }
+  }
+  function handleMouseUp() {
+    setDrawing(false);
+    if (tool !== "select") setSelected(null);
+  }
+  function handleContextMenu(e: React.MouseEvent) {
+    if (tool === "select" && dragged && selected) {
+      e.preventDefault();
+      setConfirmMove(true);
+    }
+  }
+
+  // Toolbar actions
+  function handleShapeInsert(e: React.ChangeEvent<HTMLSelectElement>) {
+    const shapeVal = e.target.value as "rectangle" | "circle" | "triangle";
+    if (!shapeVal) return;
+    saveHistory();
+    setObjects((objs) => [
+      ...objs,
+      {
+        type: "shape",
+        shape: shapeVal,
+        x: (canvasRef.current?.width ?? 0) / 2 - shapeW / 2,
+        y: (canvasRef.current?.height ?? 0) / 2 - shapeH / 2,
+        w: shapeW,
+        h: shapeH,
+        size: 0,
+        color: brushColor,
+        opacity: brushOpacity,
+      },
+    ]);
+    setSelected(null);
+    setShape("");
+  }
+  function handleDelete() {
+    if (selected) {
+      setObjects(objects.filter((o) => o !== selected));
+      setSelected(null);
+    }
+  }
+  function handleBack() {
+    if (selected) {
+      const idx = objects.indexOf(selected);
+      if (idx > 0) {
+        const newObjs = [...objects];
+        newObjs.splice(idx, 1);
+        newObjs.splice(idx - 1, 0, selected);
+        setObjects(newObjs);
+      }
+    }
+  }
+  function handleFront() {
+    if (selected) {
+      const idx = objects.indexOf(selected);
+      if (idx < objects.length - 1) {
+        const newObjs = [...objects];
+        newObjs.splice(idx, 1);
+        newObjs.splice(idx + 1, 0, selected);
+        setObjects(newObjs);
+      }
+    }
+  }
+  function handleClear() {
+    saveHistory();
+    setObjects([]);
+    setSelected(null);
+  }
+  function handleExport() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const a = document.createElement("a");
+    a.download = "drawing.png";
+    a.href = canvas.toDataURL();
+    a.click();
+  }
+
+  // Toolbar button active state
+  function btnClass(name: string) {
+    return tool === name ? "active" : "";
+  }
+
+  return (
+    <div style={{ height: "100vh", background: "#222", color: "#fff" }}>
+      <div
+        id="toolbar"
+        ref={toolbarRef}
+        style={{
+          background: "#333",
+          padding: 10,
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 10,
+          alignItems: "center",
+        }}
+      >
+        <button
+          id="pencilBtn"
+          className={btnClass("pencil")}
+          onClick={() => setTool("pencil")}
+        >
+          Pencil 🖊️
+        </button>
+        <button
+          id="lineBtn"
+          className={btnClass("line")}
+          onClick={() => setTool("line")}
+        >
+          Line 📏
+        </button>
+        <button
+          id="selectBtn"
+          className={btnClass("select")}
+          onClick={() => setTool("select")}
+        >
+          Select 🖱️
+        </button>
+        <label>
+          Size:{" "}
+          <input
+            type="range"
+            id="sizeInp"
+            min={1}
+            max={30}
+            value={brushSize}
+            onChange={(e) => setBrushSize(Number(e.target.value))}
+          />
+        </label>
+        <label>
+          Opacity:{" "}
+          <input
+            type="range"
+            id="opacityInp"
+            min={0.1}
+            max={1}
+            step={0.1}
+            value={brushOpacity}
+            onChange={(e) => setBrushOpacity(Number(e.target.value))}
+          />
+        </label>
+        <label>
+          Color:{" "}
+          <input
+            type="color"
+            id="colorInp"
+            value={brushColor}
+            onChange={(e) => setBrushColor(e.target.value)}
+          />
+        </label>
+        <label>
+          Shape:
+          <select
+            id="shapeSelect"
+            value={shape}
+            onChange={(e) => {
+              setShape(e.target.value);
+              handleShapeInsert(e);
+            }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+            <option value="">Insert Shape</option>
+            <option value="rectangle">Rectangle</option>
+            <option value="circle">Circle</option>
+            <option value="triangle">Triangle</option>
+          </select>
+        </label>
+        <label>
+          Width:{" "}
+          <input
+            type="number"
+            id="shapeW"
+            min={10}
+            value={shapeW}
+            style={{ width: 60 }}
+            onChange={(e) => setShapeW(Number(e.target.value))}
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
+        </label>
+        <label>
+          Height:{" "}
+          <input
+            type="number"
+            id="shapeH"
+            min={10}
+            value={shapeH}
+            style={{ width: 60 }}
+            onChange={(e) => setShapeH(Number(e.target.value))}
           />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        </label>
+        <button id="deleteBtn" onClick={handleDelete}>
+          Delete
+        </button>
+        <button id="back" onClick={handleBack}>
+          Send Backward
+        </button>
+        <button id="front" onClick={handleFront}>
+          Bring Forward
+        </button>
+        <button id="clear" onClick={handleClear}>
+          Clear
+        </button>
+        <button id="undoBtn" onClick={undo}>
+          Undo
+        </button>
+        <button id="exportBtn" onClick={handleExport}>
+          Export PNG
+        </button>
+        <style jsx>{`
+          button,
+          select,
+          input[type="color"],
+          input[type="range"],
+          input[type="number"] {
+            background: #444;
+            color: #fff;
+            border: none;
+            padding: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: transform 0.1s ease;
+          }
+          button:active {
+            transform: scale(0.95);
+          }
+          button.active {
+            background: #0d6efd;
+          }
+        `}</style>
+      </div>
+      <canvas
+        id="canvas"
+        ref={canvasRef}
+        style={{
+          flex: 1,
+          display: "block",
+          background: "#fff",
+          cursor: "crosshair",
+          width: "100vw",
+          height: `calc(100vh - 60px)`,
+        }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onContextMenu={handleContextMenu}
+      />
     </div>
   );
 }
