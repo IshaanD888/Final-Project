@@ -44,7 +44,6 @@ export default function Home() {
   const [drawing, setDrawing] = useState(false);
   const [start, setStart] = useState<Point>({ x: 0, y: 0 });
 
-  // Undo/Redo
   const [history, setHistory] = useState<DrawObj[][]>([]);
   const [redoStack, setRedoStack] = useState<DrawObj[][]>([]);
 
