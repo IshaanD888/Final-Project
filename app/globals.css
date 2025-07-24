@@ -1,3 +1,6 @@
+/* Import Google Fonts for new font families */
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Pacifico&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,8 +8,8 @@
 :root {
   --font-main: var(--font-geist-sans), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), monospace;
-  --font-title: 'Bebas Neue', Impact, sans-serif;      /* NEW: For titles/headings */
-  --font-special: 'Pacifico', cursive;                 /* NEW: For special words */
+  --font-title: 'Bebas Neue', Impact, sans-serif;
+  --font-special: 'Pacifico', cursive;
 
   /* Day mode color scheme */
   --color-bg: #f7f7fa;
@@ -20,14 +23,12 @@
   --color-border: #d1d5db;
   --color-shadow: 0 2px 8px rgba(0,0,0,0.07);
 
-  /* Unique day mode colors */
   --color-highlight: #ffe066;
   --color-special: #ff6f61;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Night mode color scheme */
     --color-bg: #18181b;
     --color-fg: #f7f7fa;
     --color-accent: #0d6efd;
@@ -39,14 +40,27 @@
     --color-border: #333;
     --color-shadow: 0 2px 8px rgba(0,0,0,0.25);
 
-    /* Unique night mode colors */
     --color-highlight: #3ec6e0;
     --color-special: #e67cff;
   }
 }
 
-/* Import Google Fonts for new font families */
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Pacifico&display=swap');
+/* Support for toggling dark mode with a class */
+.dark {
+  --color-bg: #18181b;
+  --color-fg: #f7f7fa;
+  --color-accent: #0d6efd;
+  --color-toolbar: #23232a;
+  --color-canvas: #222;
+  --color-btn: #333;
+  --color-btn-active: #0d6efd;
+  --color-btn-text: #fff;
+  --color-border: #333;
+  --color-shadow: 0 2px 8px rgba(0,0,0,0.25);
+
+  --color-highlight: #3ec6e0;
+  --color-special: #e67cff;
+}
 
 html, body {
   font-family: var(--font-main);
@@ -58,7 +72,6 @@ html, body {
   transition: background 0.3s, color 0.3s;
 }
 
-/* Example usage for special fonts and colors */
 h1, .title {
   font-family: var(--font-title);
   color: var(--color-accent);
