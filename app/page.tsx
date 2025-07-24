@@ -1,58 +1,58 @@
 "use client";
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 
 type Point = { x: number; y: number };
+type DrawType = "pencil" | "eraser" | "select" | "shape";
+type ShapeType = "rectangle" | "circle" | "triangle";
 type PathObj = {
   type: "path";
   points: Point[];
   size: number;
   color: string;
   opacity: number;
-};
-type LineObj = {
-  type: "line";
-  points: [Point, Point];
-  size: number;
-  color: string;
-  opacity: number;
+  isEraser?: boolean;
 };
 type ShapeObj = {
   type: "shape";
-  shape: "rectangle" | "circle" | "triangle";
+  shape: ShapeType;
   x: number;
   y: number;
   w: number;
   h: number;
-  size: number;
   color: string;
   opacity: number;
 };
-type DrawObj = PathObj | LineObj | ShapeObj;
+type DrawObj = PathObj | ShapeObj;
 
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
 
-  // Drawing state
-  const [tool, setTool] = useState<"pencil" | "line" | "select">("pencil");
-  const [brushSize, setBrushSize] = useState(5);
-  const [brushColor, setBrushColor] = useState("#000000");
-  const [brushOpacity, setBrushOpacity] = useState(1);
-  const [shape, setShape] = useState("");
+  // UI state
+  const [tool, setTool] = useState<DrawType>("pencil");
+  const [color, setColor] = useState("#000000");
+  const [size, setSize] = useState(5);
+  const [opacity, setOpacity] = useState(1);
+  const [shapeType, setShapeType] = useState<ShapeType>("rectangle");
   const [shapeW, setShapeW] = useState(100);
   const [shapeH, setShapeH] = useState(60);
+  const [theme, setTheme] = useState("light");
 
-  // Drawing logic state
+  // Drawing state
   const [objects, setObjects] = useState<DrawObj[]>([]);
-  const [history, setHistory] = useState<string[]>([]);
-  const [selected, setSelected] = useState<DrawObj | null>(null);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [confirmMove, setConfirmMove] = useState(false);
+  const [selected, setSelected] = useState<number | null>(null);
   const [drawing, setDrawing] = useState(false);
-  const [dragged, setDragged] = useState(false);
-  const [start, setStart] = useState({ x: 0, y: 0 });
+  const [start, setStart] = useState<Point>({ x: 0, y: 0 });
 
-  // Resize canvas on window resize
+  // Undo/Redo
+  const [history, setHistory] = useState<DrawObj[][]>([]);
+  const [redoStack, setRedoStack] = useState<DrawObj[][]>([]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
+
+  // Resize canvas on window resize/orientation change
   useEffect(() => {
     function resizeCanvas() {
       const canvas = canvasRef.current;
@@ -64,288 +64,240 @@ export default function Home() {
       }
     }
     window.addEventListener("resize", resizeCanvas);
+    window.addEventListener("orientationchange", resizeCanvas);
     resizeCanvas();
-    return () => window.removeEventListener("resize", resizeCanvas);
-    // eslint-disable-next-line
+    return () => {
+      window.removeEventListener("resize", resizeCanvas);
+      window.removeEventListener("orientationchange", resizeCanvas);
+    };
   }, []);
 
-  // Redraw on objects/selected/confirmMove change
+  // Redraw on objects/selected/tool change
   useEffect(() => {
     redraw();
     // eslint-disable-next-line
-  }, [objects, selected, confirmMove]);
+  }, [objects, selected, tool]);
 
-  // Drawing helpers
-  function saveHistory() {
-    setHistory((h) => [...h, JSON.stringify(objects)]);
-  }
-  function undo() {
-    setHistory((h) => {
-      if (h.length) {
-        setObjects(JSON.parse(h[h.length - 1]));
-        setSelected(null);
-        setConfirmMove(false);
-        return h.slice(0, -1);
-      }
-      return h;
-    });
-  }
-  function redraw() {
+  const redraw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    objects.forEach((obj) => drawObject(ctx, obj));
-    if (selected) {
-      const x = getX(selected),
-        y = getY(selected),
-        w = getW(selected),
-        h = getH(selected);
-      ctx.globalAlpha = 1;
-      ctx.setLineDash([5, 5]);
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = confirmMove ? "lime" : "red";
-      ctx.strokeRect(x, y, w, h);
-      ctx.setLineDash([]);
-    }
-  }
-  function drawObject(ctx: CanvasRenderingContext2D, obj: DrawObj) {
-    ctx.globalAlpha = obj.opacity;
-    ctx.lineWidth = obj.size;
-    ctx.strokeStyle = obj.color;
-    ctx.fillStyle = obj.color;
-    if (obj.type === "path") {
-      ctx.beginPath();
-      ctx.moveTo(obj.points[0].x, obj.points[0].y);
-      obj.points.forEach((p, i) => i > 0 && ctx.lineTo(p.x, p.y));
-      ctx.stroke();
-    } else if (obj.type === "line") {
-      ctx.beginPath();
-      ctx.moveTo(obj.points[0].x, obj.points[0].y);
-      ctx.lineTo(obj.points[1].x, obj.points[1].y);
-      ctx.stroke();
-    } else if (obj.type === "shape") {
-      ctx.beginPath();
-      if (obj.shape === "rectangle") {
-        ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
-      } else if (obj.shape === "circle") {
-        ctx.arc(
-          obj.x + obj.w / 2,
-          obj.y + obj.h / 2,
-          Math.min(obj.w, obj.h) / 2,
-          0,
-          2 * Math.PI
-        );
-        ctx.fill();
-      } else if (obj.shape === "triangle") {
-        ctx.moveTo(obj.x + obj.w / 2, obj.y);
-        ctx.lineTo(obj.x, obj.y + obj.h);
-        ctx.lineTo(obj.x + obj.w, obj.y + obj.h);
-        ctx.closePath();
-        ctx.fill();
-      }
-    }
-  }
-  function isHit(o: DrawObj, x: number, y: number): boolean {
-    const ox = getX(o),
-      oy = getY(o),
-      w = getW(o),
-      h = getH(o);
-    return (
-      typeof ox === "number" &&
-      typeof oy === "number" &&
-      typeof w === "number" &&
-      typeof h === "number" &&
-      x >= ox &&
-      x <= ox + w &&
-      y >= oy &&
-      y <= oy + h
-    );
-  }
-  function getX(o: DrawObj): number {
-    if (o.type === "path") return Math.min(...o.points.map((p) => p.x));
-    if (o.type === "line") return Math.min(o.points[0].x, o.points[1].x);
-    if ("x" in o) return o.x;
-    return 0;
-  }
-  function getY(o: DrawObj): number {
-    if (o.type === "path") return Math.min(...o.points.map((p) => p.y));
-    if (o.type === "line") return Math.min(o.points[0].y, o.points[1].y);
-    if ("y" in o) return o.y;
-    return 0;
-  }
-  function getW(o: DrawObj): number {
-    if (o.type === "path")
-      return Math.max(...o.points.map((p) => p.x)) - getX(o);
-    if (o.type === "line") return Math.abs(o.points[1].x - o.points[0].x);
-    if ("w" in o) return o.w;
-    return 0;
-  }
-  function getH(o: DrawObj): number {
-    if (o.type === "path")
-      return Math.max(...o.points.map((p) => p.y)) - getY(o);
-    if (o.type === "line") return Math.abs(o.points[1].y - o.points[0].y);
-    if ("h" in o) return o.h;
-    return 0;
-  }
-  function shift(o: DrawObj, dx: number, dy: number) {
-    if (o.type === "path" || o.type === "line") {
-      o.points = o.points.map((p) => ({ x: p.x + dx, y: p.y + dy }));
-    } else {
-      o.x += dx;
-      o.y += dy;
-    }
-  }
-
-  // Mouse events
-  function handleMouseDown(e: React.MouseEvent) {
-    const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    setStart({ x, y });
-    setDragged(false);
-    setConfirmMove(false);
-
-    if (tool === "select") {
-      for (let i = objects.length - 1; i >= 0; i--) {
-        if (isHit(objects[i], x, y)) {
-          setSelected(objects[i]);
-          setOffset({ x: x - getX(objects[i]), y: y - getY(objects[i]) });
-          setConfirmMove(false);
-          return;
+    objects.forEach((obj, idx) => {
+      if (obj.type === "path") {
+        ctx.globalAlpha = obj.opacity;
+        ctx.lineWidth = obj.size;
+        ctx.strokeStyle = obj.isEraser ? "#fff" : obj.color;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(obj.points[0].x, obj.points[0].y);
+        obj.points.forEach((p, i) => i > 0 && ctx.lineTo(p.x, p.y));
+        ctx.stroke();
+      } else if (obj.type === "shape") {
+        ctx.globalAlpha = obj.opacity;
+        ctx.fillStyle = obj.color;
+        ctx.beginPath();
+        if (obj.shape === "rectangle") {
+          ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
+        } else if (obj.shape === "circle") {
+          ctx.arc(
+            obj.x + obj.w / 2,
+            obj.y + obj.h / 2,
+            Math.min(obj.w, obj.h) / 2,
+            0,
+            2 * Math.PI
+          );
+          ctx.fill();
+        } else if (obj.shape === "triangle") {
+          ctx.moveTo(obj.x + obj.w / 2, obj.y);
+          ctx.lineTo(obj.x, obj.y + obj.h);
+          ctx.lineTo(obj.x + obj.w, obj.y + obj.h);
+          ctx.closePath();
+          ctx.fill();
         }
       }
-    } else {
-      saveHistory();
+      // Draw selection
+      if (selected === idx) {
+        ctx.globalAlpha = 1;
+        ctx.setLineDash([5, 5]);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "#0d6efd";
+        let x = 0,
+          y = 0,
+          w = 0,
+          h = 0;
+        if (obj.type === "shape") {
+          x = obj.x;
+          y = obj.y;
+          w = obj.w;
+          h = obj.h;
+        } else if (obj.type === "path") {
+          const xs = obj.points.map((p) => p.x);
+          const ys = obj.points.map((p) => p.y);
+          x = Math.min(...xs);
+          y = Math.min(...ys);
+          w = Math.max(...xs) - x;
+          h = Math.max(...ys) - y;
+        }
+        ctx.strokeRect(x, y, w, h);
+        ctx.setLineDash([]);
+      }
+    });
+  }, [objects, selected, tool]);
+
+  // Unified pointer event handler
+  function getPointerFromEvent(e: React.MouseEvent | React.TouchEvent): Point {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    if ("touches" in e && e.touches.length > 0) {
+      return {
+        x: e.touches[0].clientX - rect.left,
+        y: e.touches[0].clientY - rect.top,
+      };
+    } else if ("clientX" in e) {
+      return {
+        x: (e as React.MouseEvent).clientX - rect.left,
+        y: (e as React.MouseEvent).clientY - rect.top,
+      };
+    }
+    return { x: 0, y: 0 };
+  }
+
+  // Save history for undo
+  function pushHistory(newObjs: DrawObj[]) {
+    setHistory((h) => [...h, objects]);
+    setRedoStack([]); // clear redo stack on new action
+    setObjects(newObjs);
+  }
+
+  // Mouse/touch events
+  const handlePointerDown = useCallback(
+    (e: React.MouseEvent | React.TouchEvent) => {
+      e.preventDefault();
+      const pt = getPointerFromEvent(e);
+      setStart(pt);
       setDrawing(true);
-      setSelected(null);
-      if (tool === "pencil") {
-        setObjects((objs) => [
-          ...objs,
+
+      if (tool === "pencil" || tool === "eraser") {
+        pushHistory([
+          ...objects,
           {
             type: "path",
-            points: [{ x, y }],
-            size: brushSize,
-            color: brushColor,
-            opacity: brushOpacity,
+            points: [pt],
+            size,
+            color,
+            opacity,
+            isEraser: tool === "eraser",
           },
         ]);
-      } else if (tool === "line") {
-        setObjects((objs) => [
-          ...objs,
-          {
-            type: "line",
-            points: [
-              { x, y },
-              { x, y },
-            ],
-            size: brushSize,
-            color: brushColor,
-            opacity: brushOpacity,
-          },
-        ]);
-      }
-    }
-  }
-  function handleMouseMove(e: React.MouseEvent) {
-    const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    if (tool === "select" && selected && !confirmMove) {
-      setDragged(true);
-      const dx = x - offset.x - getX(selected);
-      const dy = y - offset.y - getY(selected);
-      setObjects((objs) =>
-        objs.map((obj) =>
-          obj === selected
-            ? (() => {
-                const copy = JSON.parse(JSON.stringify(obj));
-                shift(copy, dx, dy);
-                return copy;
-              })()
-            : obj
-        )
-      );
-    } else if (drawing) {
-      setObjects((objs) => {
-        const newObjs = [...objs];
-        const obj = newObjs[newObjs.length - 1];
-        if (!obj) return newObjs;
-        if (obj.type === "path") {
-          obj.points = [...obj.points, { x, y }];
-        } else if (obj.type === "line") {
-          obj.points = [obj.points[0], { x, y }];
+        setSelected(null);
+      } else if (tool === "select") {
+        // Select topmost object under pointer
+        for (let i = objects.length - 1; i >= 0; i--) {
+          const obj = objects[i];
+          let hit = false;
+          if (obj.type === "shape") {
+            hit =
+              pt.x >= obj.x &&
+              pt.x <= obj.x + obj.w &&
+              pt.y >= obj.y &&
+              pt.y <= obj.y + obj.h;
+          } else if (obj.type === "path") {
+            const xs = obj.points.map((p) => p.x);
+            const ys = obj.points.map((p) => p.y);
+            hit =
+              pt.x >= Math.min(...xs) &&
+              pt.x <= Math.max(...xs) &&
+              pt.y >= Math.min(...ys) &&
+              pt.y <= Math.max(...ys);
+          }
+          if (hit) {
+            setSelected(i);
+            return;
+          }
         }
-        newObjs[newObjs.length - 1] = obj;
-        return newObjs;
-      });
-    }
-  }
-  function handleMouseUp() {
-    setDrawing(false);
-    if (tool !== "select") setSelected(null);
-  }
-  function handleContextMenu(e: React.MouseEvent) {
-    if (tool === "select" && dragged && selected) {
-      e.preventDefault();
-      setConfirmMove(true);
-    }
-  }
+        setSelected(null);
+      } else if (tool === "shape") {
+        pushHistory([
+          ...objects,
+          {
+            type: "shape",
+            shape: shapeType,
+            x: pt.x - shapeW / 2,
+            y: pt.y - shapeH / 2,
+            w: shapeW,
+            h: shapeH,
+            color,
+            opacity,
+          },
+        ]);
+        setSelected(objects.length); // select the new shape
+      }
+      // eslint-disable-next-line
+    },
+    [tool, color, size, opacity, shapeType, shapeW, shapeH, objects]
+  );
 
-  // Toolbar actions
-  function handleShapeInsert(e: React.ChangeEvent<HTMLSelectElement>) {
-    const shapeVal = e.target.value as "rectangle" | "circle" | "triangle";
-    if (!shapeVal) return;
-    saveHistory();
-    setObjects((objs) => [
-      ...objs,
-      {
-        type: "shape",
-        shape: shapeVal,
-        x: (canvasRef.current?.width ?? 0) / 2 - shapeW / 2,
-        y: (canvasRef.current?.height ?? 0) / 2 - shapeH / 2,
-        w: shapeW,
-        h: shapeH,
-        size: 0,
-        color: brushColor,
-        opacity: brushOpacity,
-      },
-    ]);
+  const handlePointerMove = useCallback(
+    (e: React.MouseEvent | React.TouchEvent) => {
+      if (!drawing) return;
+      const pt = getPointerFromEvent(e);
+      if (tool === "pencil" || tool === "eraser") {
+        setObjects((objs) => {
+          const newObjs = [...objs];
+          const obj = { ...newObjs[newObjs.length - 1] } as PathObj;
+          if (obj && obj.type === "path") {
+            obj.points = [...obj.points, pt];
+            newObjs[newObjs.length - 1] = obj;
+          }
+          return newObjs;
+        });
+      } else if (tool === "select" && selected !== null) {
+        setObjects((objs) => {
+          const newObjs = [...objs];
+          const obj = { ...newObjs[selected] };
+          if (obj.type === "shape") {
+            obj.x += pt.x - start.x;
+            obj.y += pt.y - start.y;
+          } else if (obj.type === "path") {
+            obj.points = obj.points.map((p) => ({
+              x: p.x + (pt.x - start.x),
+              y: p.y + (pt.y - start.y),
+            }));
+          }
+          newObjs[selected] = obj;
+          return newObjs;
+        });
+        setStart(pt);
+      }
+      // eslint-disable-next-line
+    },
+    [drawing, tool, selected, start]
+  );
+
+  const handlePointerUp = useCallback(() => {
+    setDrawing(false);
+  }, []);
+
+  // Undo/Redo/Clear/Export/Delete/Layer
+  function handleUndo() {
+    if (history.length === 0) return;
+    setRedoStack((r) => [objects, ...r]);
+    setObjects(history[history.length - 1]);
+    setHistory((h) => h.slice(0, -1));
     setSelected(null);
-    setShape("");
   }
-  function handleDelete() {
-    if (selected) {
-      setObjects(objects.filter((o) => o !== selected));
-      setSelected(null);
-    }
-  }
-  function handleBack() {
-    if (selected) {
-      const idx = objects.indexOf(selected);
-      if (idx > 0) {
-        const newObjs = [...objects];
-        newObjs.splice(idx, 1);
-        newObjs.splice(idx - 1, 0, selected);
-        setObjects(newObjs);
-      }
-    }
-  }
-  function handleFront() {
-    if (selected) {
-      const idx = objects.indexOf(selected);
-      if (idx < objects.length - 1) {
-        const newObjs = [...objects];
-        newObjs.splice(idx, 1);
-        newObjs.splice(idx + 1, 0, selected);
-        setObjects(newObjs);
-      }
-    }
+  function handleRedo() {
+    if (redoStack.length === 0) return;
+    setHistory((h) => [...h, objects]);
+    setObjects(redoStack[0]);
+    setRedoStack((r) => r.slice(1));
+    setSelected(null);
   }
   function handleClear() {
-    saveHistory();
-    setObjects([]);
+    pushHistory([]);
     setSelected(null);
   }
   function handleExport() {
@@ -356,173 +308,234 @@ export default function Home() {
     a.href = canvas.toDataURL();
     a.click();
   }
-
-  // Toolbar button active state
-  function btnClass(name: string) {
-    return tool === name ? "active" : "";
+  function handleDelete() {
+    if (selected === null) return;
+    const newObjs = objects.filter((_, i) => i !== selected);
+    pushHistory(newObjs);
+    setSelected(null);
+  }
+  function handleBringForward() {
+    if (selected === null || selected === objects.length - 1) return;
+    const newObjs = [...objects];
+    const [item] = newObjs.splice(selected, 1);
+    newObjs.splice(selected + 1, 0, item);
+    pushHistory(newObjs);
+    setSelected(selected + 1);
+  }
+  function handleSendBackward() {
+    if (selected === null || selected === 0) return;
+    const newObjs = [...objects];
+    const [item] = newObjs.splice(selected, 1);
+    newObjs.splice(selected - 1, 0, item);
+    pushHistory(newObjs);
+    setSelected(selected - 1);
   }
 
+  // Toolbar
   return (
-    <div style={{ height: "100vh", background: "#222", color: "#fff" }}>
-      <div
-        id="toolbar"
-        ref={toolbarRef}
-        style={{
-          background: "#333",
-          padding: 10,
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 10,
-          alignItems: "center",
-        }}
-      >
+    <div className="drawing-app-root">
+      <div ref={toolbarRef} className="toolbar">
         <button
-          id="pencilBtn"
-          className={btnClass("pencil")}
+          style={{ background: tool === "pencil" ? "#0d6efd" : undefined }}
           onClick={() => setTool("pencil")}
         >
-          Pencil 🖊️
+          Pencil
         </button>
         <button
-          id="lineBtn"
-          className={btnClass("line")}
-          onClick={() => setTool("line")}
+          style={{ background: tool === "eraser" ? "#0d6efd" : undefined }}
+          onClick={() => setTool("eraser")}
         >
-          Line 📏
+          Eraser
         </button>
         <button
-          id="selectBtn"
-          className={btnClass("select")}
+          style={{ background: tool === "select" ? "#0d6efd" : undefined }}
           onClick={() => setTool("select")}
         >
-          Select 🖱️
+          Select
         </button>
+        <button
+          style={{ background: tool === "shape" ? "#0d6efd" : undefined }}
+          onClick={() => setTool("shape")}
+        >
+          Shape
+        </button>
+        <label>
+          Color:{" "}
+          <input
+            type="color"
+            value={color}
+            onChange={(e) => setColor(e.target.value)}
+            disabled={tool === "eraser"}
+          />
+        </label>
         <label>
           Size:{" "}
           <input
             type="range"
-            id="sizeInp"
             min={1}
             max={30}
-            value={brushSize}
-            onChange={(e) => setBrushSize(Number(e.target.value))}
+            value={size}
+            onChange={(e) => setSize(Number(e.target.value))}
           />
         </label>
         <label>
           Opacity:{" "}
           <input
             type="range"
-            id="opacityInp"
             min={0.1}
             max={1}
             step={0.1}
-            value={brushOpacity}
-            onChange={(e) => setBrushOpacity(Number(e.target.value))}
+            value={opacity}
+            onChange={(e) => setOpacity(Number(e.target.value))}
           />
         </label>
-        <label>
-          Color:{" "}
-          <input
-            type="color"
-            id="colorInp"
-            value={brushColor}
-            onChange={(e) => setBrushColor(e.target.value)}
-          />
-        </label>
-        <label>
-          Shape:
-          <select
-            id="shapeSelect"
-            value={shape}
-            onChange={(e) => {
-              setShape(e.target.value);
-              handleShapeInsert(e);
-            }}
-          >
-            <option value="">Insert Shape</option>
-            <option value="rectangle">Rectangle</option>
-            <option value="circle">Circle</option>
-            <option value="triangle">Triangle</option>
-          </select>
-        </label>
-        <label>
-          Width:{" "}
-          <input
-            type="number"
-            id="shapeW"
-            min={10}
-            value={shapeW}
-            style={{ width: 60 }}
-            onChange={(e) => setShapeW(Number(e.target.value))}
-          />
-        </label>
-        <label>
-          Height:{" "}
-          <input
-            type="number"
-            id="shapeH"
-            min={10}
-            value={shapeH}
-            style={{ width: 60 }}
-            onChange={(e) => setShapeH(Number(e.target.value))}
-          />
-        </label>
-        <button id="deleteBtn" onClick={handleDelete}>
-          Delete
-        </button>
-        <button id="back" onClick={handleBack}>
-          Send Backward
-        </button>
-        <button id="front" onClick={handleFront}>
-          Bring Forward
-        </button>
-        <button id="clear" onClick={handleClear}>
-          Clear
-        </button>
-        <button id="undoBtn" onClick={undo}>
+        {tool === "shape" && (
+          <>
+            <select
+              value={shapeType}
+              onChange={(e) => setShapeType(e.target.value as ShapeType)}
+            >
+              <option value="rectangle">Rectangle</option>
+              <option value="circle">Circle</option>
+              <option value="triangle">Triangle</option>
+            </select>
+            <label>
+              W:{" "}
+              <input
+                type="number"
+                min={10}
+                value={shapeW}
+                onChange={(e) => setShapeW(Number(e.target.value))}
+                style={{ width: 50 }}
+              />
+            </label>
+            <label>
+              H:{" "}
+              <input
+                type="number"
+                min={10}
+                value={shapeH}
+                onChange={(e) => setShapeH(Number(e.target.value))}
+                style={{ width: 50 }}
+              />
+            </label>
+          </>
+        )}
+        <button onClick={handleUndo} disabled={history.length === 0}>
           Undo
         </button>
-        <button id="exportBtn" onClick={handleExport}>
-          Export PNG
+        <button onClick={handleRedo} disabled={redoStack.length === 0}>
+          Redo
         </button>
-        <style jsx>{`
-          button,
-          select,
-          input[type="color"],
-          input[type="range"],
-          input[type="number"] {
-            background: #444;
-            color: #fff;
-            border: none;
-            padding: 5px;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: transform 0.1s ease;
-          }
-          button:active {
-            transform: scale(0.95);
-          }
-          button.active {
-            background: #0d6efd;
-          }
-        `}</style>
+        <button onClick={handleClear}>Clear</button>
+        <button onClick={handleExport}>Export PNG</button>
+        <button onClick={handleDelete} disabled={selected === null}>
+          Delete
+        </button>
+        <button
+          onClick={handleBringForward}
+          disabled={selected === null || selected === objects.length - 1}
+        >
+          Bring Forward
+        </button>
+        <button
+          onClick={handleSendBackward}
+          disabled={selected === null || selected === 0}
+        >
+          Send Backward
+        </button>
+        <button onClick={() => setTheme(theme === "light" ? "dark" : "light")}>
+          {theme === "light" ? "🌙 Night" : "☀️ Day"}
+        </button>
       </div>
-      <canvas
-        id="canvas"
-        ref={canvasRef}
-        style={{
-          flex: 1,
-          display: "block",
-          background: "#fff",
-          cursor: "crosshair",
-          width: "100vw",
-          height: `calc(100vh - 60px)`,
-        }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onContextMenu={handleContextMenu}
-      />
+      <div className="canvas-container">
+        <canvas
+          ref={canvasRef}
+          className="drawing-canvas"
+          width={typeof window !== "undefined" ? window.innerWidth : 800}
+          height={
+            typeof window !== "undefined"
+              ? window.innerHeight - (toolbarRef.current?.offsetHeight || 60)
+              : 600
+          }
+          onMouseDown={handlePointerDown}
+          onMouseMove={handlePointerMove}
+          onMouseUp={handlePointerUp}
+          onTouchStart={handlePointerDown}
+          onTouchMove={handlePointerMove}
+          onTouchEnd={handlePointerUp}
+        />
+      </div>
+      <style jsx global>{`
+        .drawing-app-root {
+          height: 100vh;
+          background: #222;
+          color: #fff;
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          grid-template-rows: auto 1fr;
+          gap: 0;
+        }
+        .toolbar {
+          grid-column: 1 / span 3;
+          background: #333;
+          padding: 10px;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+          align-items: center;
+        }
+        .canvas-container {
+          grid-column: 1 / span 3;
+          width: 100%;
+          height: 100%;
+          background: #111;
+        }
+        .drawing-canvas {
+          display: block;
+          background: #fff;
+          cursor: crosshair;
+          width: 100vw;
+          height: 100%;
+          touch-action: none;
+        }
+        @media (max-width: 1099px) {
+          .drawing-app-root {
+            grid-template-columns: repeat(2, 1fr);
+          }
+          .toolbar, .canvas-container {
+            grid-column: 1 / span 2;
+          }
+        }
+        @media (max-width: 699px) {
+          .drawing-app-root {
+            grid-template-columns: 1fr;
+          }
+          .toolbar, .canvas-container {
+            grid-column: 1 / span 1;
+          }
+        }
+        button,
+        select,
+        input[type="color"],
+        input[type="range"],
+        input[type="number"] {
+          background: #444;
+          color: #fff;
+          border: none;
+          padding: 5px;
+          border-radius: 4px;
+          cursor: pointer;
+          transition: transform 0.1s ease;
+        }
+        button:active {
+          transform: scale(0.95);
+        }
+        button[disabled] {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+      `}</style>
     </div>
   );
 }

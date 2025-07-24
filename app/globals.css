@@ -3,19 +3,78 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --font-main: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
+  --color-bg: #f7f7fa;
+  --color-fg: #18181b;
+  --color-accent: #0d6efd;
+  --color-toolbar: #eaeaea;
+  --color-canvas: #fff;
+  --color-btn: #444;
+  --color-btn-active: #0d6efd;
+  --color-btn-text: #fff;
+  --color-border: #d1d5db;
+  --color-shadow: 0 2px 8px rgba(0,0,0,0.07);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --color-bg: #18181b;
+    --color-fg: #f7f7fa;
+    --color-accent: #0d6efd;
+    --color-toolbar: #23232a;
+    --color-canvas: #222;
+    --color-btn: #333;
+    --color-btn-active: #0d6efd;
+    --color-btn-text: #fff;
+    --color-border: #333;
+    --color-shadow: 0 2px 8px rgba(0,0,0,0.25);
   }
+}
+
+html, body {
+  font-family: var(--font-main);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  transition: background 0.3s, color 0.3s;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+button, select, input[type="color"], input[type="range"], input[type="number"] {
+  background: var(--color-btn);
+  color: var(--color-btn-text);
+  border: none;
+  padding: 6px 12px;
+  border-radius: 5px;
+  font-family: var(--font-main);
+  font-size: 1rem;
+  margin-right: 4px;
+  box-shadow: var(--color-shadow);
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+button:active {
+  background: var(--color-btn-active);
+  color: #fff;
+}
+button[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.toolbar {
+  background: var(--color-toolbar);
+  box-shadow: var(--color-shadow);
+}
+.drawing-canvas {
+  background: var(--color-canvas);
+  border: 2px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: var(--color-shadow);
 }
