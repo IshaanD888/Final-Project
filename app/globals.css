@@ -1,18 +1,14 @@
-/* Global styles for the drawing app */
-
 body {
   margin: 0;
   font-family: Arial, sans-serif;
   background: #f7f7fa;
   color: #18181b;
 }
-
 .drawing-app {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
-
 .toolbar {
   background: #e5e7eb;
   padding: 8px 12px;
@@ -23,7 +19,6 @@ body {
   user-select: none;
   flex-wrap: wrap;
 }
-
 .toolbar button,
 .toolbar select,
 .toolbar input[type="color"],
@@ -37,36 +32,27 @@ body {
   transition: background 0.2s, color 0.2s, transform 0.1s;
   font-size: 1rem;
 }
-
 .toolbar button.active,
 .toolbar button:focus {
   background: #2563eb;
   color: #fff;
 }
-
 .toolbar button:hover {
   background: #60a5fa;
   color: #fff;
 }
-
 .toolbar label {
   display: flex;
   align-items: center;
   gap: 4px;
   font-size: 1rem;
 }
-
-.shape-select {
-  min-width: 110px;
-}
-
 .canvas-container {
   flex: 1;
   position: relative;
   background: #fff;
   overflow: hidden;
 }
-
 .drawing-canvas {
   width: 100vw;
   height: calc(100vh - 56px);
@@ -75,4 +61,14 @@ body {
   cursor: crosshair;
   border: none;
   outline: none;
+}
+.night {
+  --bg: #222; --fg: #eee;
+  --toolbar-bg: #333; --btn-bg: #444; --btn-hover: #555;
+  background: var(--bg);
+  color: var(--fg);
+}
+.labelText {
+  font-family: 'Pacifico', cursive;
+  margin-right: 4px;
 }
