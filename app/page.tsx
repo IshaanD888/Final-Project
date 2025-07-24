@@ -188,7 +188,7 @@ export default function DrawingApp() {
     }
   }
 
-  function handleUp(e: React.MouseEvent) {
+  function handleUp() {
     if (tool === "pencil" && drawing && currentPath.length > 1) {
       setObjects((objs) => [
         ...objs,
