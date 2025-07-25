@@ -2,43 +2,45 @@
 @tailwind components;
 @tailwind utilities;
 
+/* app/globals.css */
+
+/* Base light theme variables */
 :root {
-  --font-main: var(--font-geist-sans), system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), monospace;
-  --color-bg: #f7f7fa;
-  --color-fg: #18181b;
-  --color-accent: #0d6efd;
-  --color-toolbar: #eaeaea;
-  --color-canvas: #fff;
+  --color-bg: #fff;
+  --color-fg: #222;
+  --color-toolbar: #eee;
+  --color-toolbar-fg: #fff;
   --color-btn: #444;
+  --color-btn-hover: #0d6efd;
   --color-btn-active: #0d6efd;
-  --color-btn-text: #fff;
-  --color-border: #d1d5db;
-  --color-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  --color-btn-disabled: #888;
+  --color-canvas: #fff;
+  --color-canvas-border: #aaa;
+  --color-selection: #0d6efd;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-bg: #18181b;
-    --color-fg: #f7f7fa;
-    --color-accent: #0d6efd;
-    --color-toolbar: #23232a;
-    --color-canvas: #222;
-    --color-btn: #333;
-    --color-btn-active: #0d6efd;
-    --color-btn-text: #fff;
-    --color-border: #333;
-    --color-shadow: 0 2px 8px rgba(0,0,0,0.25);
-  }
-}
+/* Night (dark) theme overrides */
+/*[data-theme="dark"] {
+  --color-bg: #222;
+  --color-fg: #eee;
+  --color-toolbar: #333;
+  --color-toolbar-fg: #eee;
+  --color-btn: #444;
+  --color-btn-hover: #2563eb;
+  --color-btn-active: #0d6efd;
+  --color-btn-disabled: #555;
+  --color-canvas: #111;
+  --color-canvas-border: #444;
+  --color-selection: #60a5fa;
+}*/
 
 html, body {
-  font-family: var(--font-main);
-  background: var(--color-bg);
-  color: var(--color-fg);
+  height: 100%;
   margin: 0;
   padding: 0;
-  min-height: 100vh;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: Arial, Helvetica, sans-serif;
   transition: background 0.3s, color 0.3s;
 }
 
@@ -48,33 +50,122 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-button, select, input[type="color"], input[type="range"], input[type="number"] {
-  background: var(--color-btn);
-  color: var(--color-btn-text);
-  border: none;
-  padding: 6px 12px;
-  border-radius: 5px;
-  font-family: var(--font-main);
-  font-size: 1rem;
-  margin-right: 4px;
-  box-shadow: var(--color-shadow);
-  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+.drawing-app-root {
+  min-height: 100vh;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: auto 1fr;
+  gap: 0;
+  transition: background 0.3s, color 0.3s;
 }
+
+.toolbar {
+  grid-column: 1 / span 3;
+  background: var(--color-toolbar);
+  color: var(--color-toolbar-fg);
+  padding: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  transition: background 0.3s, color 0.3s;
+}
+
+.canvas-container {
+  grid-column: 1 / span 3;
+  width: 100%;
+  height: 100%;
+  background: var(--color-canvas);
+  transition: background 0.3s;
+}
+
+.drawing-canvas {
+  display: block;
+  background: var(--color-canvas);
+  cursor: crosshair;
+  width: 100vw;
+  height: 100%;
+  border-top: 2px solid var(--color-canvas-border);
+  touch-action: none;
+  transition: background 0.3s, border-color 0.3s;
+}
+
+/* Only change the canvas background and border in dark mode */
+[data-theme="dark"] .drawing-canvas {
+  background: #111 !important;
+  border-top: 2px solid #444 !important;
+}
+
+/* Responsive grid for smaller screens */
+@media (max-width: 1099px) {
+  .drawing-app-root {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .toolbar, .canvas-container {
+    grid-column: 1 / span 2;
+  }
+}
+@media (max-width: 699px) {
+  .drawing-app-root {
+    grid-template-columns: 1fr;
+  }
+  .toolbar, .canvas-container {
+    grid-column: 1 / span 1;
+  }
+}
+
+/* Toolbar controls */
+button,
+select,
+input[type="color"],
+input[type="range"],
+input[type="number"] {
+  background: var(--color-btn);
+  color: var(--color-fg);
+  border: none;
+  padding: 5px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, transform 0.1s;
+  font-size: 1rem;
+}
+
+button:hover,
+select:hover,
+input[type="color"]:hover,
+input[type="range"]:hover,
+input[type="number"]:hover {
+  background: var(--color-btn-hover);
+  color: #fff;
+}
+
 button:active {
   background: var(--color-btn-active);
   color: #fff;
+  transform: scale(0.96);
 }
+
 button[disabled] {
   opacity: 0.5;
   cursor: not-allowed;
+  background: var(--color-btn-disabled);
 }
-.toolbar {
-  background: var(--color-toolbar);
-  box-shadow: var(--color-shadow);
+
+button.active {
+  background: var(--color-btn-active);
+  color: #fff;
 }
-.drawing-canvas {
-  background: var(--color-canvas);
-  border: 2px solid var(--color-border);
-  border-radius: 8px;
-  box-shadow: var(--color-shadow);
+
+/* Selection highlight */
+.selection-outline {
+  outline: 2px dashed var(--color-selection);
+  outline-offset: 2px;
+}
+
+/* Misc */
+label {
+  margin-right: 8px;
+  font-size: 1rem;
 }
