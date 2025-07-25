@@ -358,15 +358,19 @@ export default function Home() {
         <div className="drawing-app-root">
           <div ref={toolbarRef} className="toolbar">
             <button
-              style={{ background: tool === "pencil" ? "#0d6efd" : undefined }}
+              style={{ background: tool === "pencil" ? "#0d6efd" : undefined, display: "flex", alignItems: "center", gap: 4 }}
               onClick={() => setTool("pencil")}
             >
+              {/* Pencil emoji icon */}
+              <span style={{ fontSize: 18, marginRight: 4 }}>✏️</span>
               Pencil
             </button>
             <button
-              style={{ background: tool === "eraser" ? "#0d6efd" : undefined }}
+              style={{ background: tool === "eraser" ? "#0d6efd" : undefined, display: "flex", alignItems: "center", gap: 4 }}
               onClick={() => setTool("eraser")}
             >
+              {/* Eraser emoji icon */}
+              <span style={{ fontSize: 18, marginRight: 4 }}>🧽</span>
               Eraser
             </button>
             <button
@@ -563,3 +567,12 @@ export default function Home() {
     </ButtonSoundContext.Provider>
   );
 }
+// ...existing code...
+<button
+  style={{ background: tool === "pencil" ? "#0d6efd" : undefined, display: "flex", alignItems: "center", gap: 4 }}
+  onClick={() => setTool("pencil")}
+>
+  <span style={{ fontSize: 18, marginRight: 4 }}>✏️</span>
+  Pencil
+</button>
+// ...existing code...
