@@ -55,6 +55,7 @@ export default function Home() {
 
   const [history, setHistory] = useState<DrawObj[][]>([]);
   const [redoStack, setRedoStack] = useState<DrawObj[][]>([]);
+  const [resizeHandle, setResizeHandle] = useState<number | null>(null); // 0:tl, 1:tr, 2:bl, 3:br
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -76,14 +77,23 @@ export default function Home() {
       if (obj.type === "path") {
         ctx.globalAlpha = obj.opacity;
         ctx.lineWidth = obj.size;
-        ctx.strokeStyle = obj.isEraser ? "#fff" : obj.color;
         ctx.lineCap = "round";
+        // FIX: Use destination-out for eraser
+        if (obj.isEraser) {
+          ctx.globalCompositeOperation = "destination-out";
+          ctx.strokeStyle = "rgba(0,0,0,1)";
+        } else {
+          ctx.globalCompositeOperation = "source-over";
+          ctx.strokeStyle = obj.color;
+        }
         ctx.beginPath();
         ctx.moveTo(obj.points[0].x, obj.points[0].y);
         obj.points.forEach((p, i) => i > 0 && ctx.lineTo(p.x, p.y));
         ctx.stroke();
+        ctx.globalCompositeOperation = "source-over"; // reset after stroke
       } else if (obj.type === "shape") {
         ctx.globalAlpha = obj.opacity;
+        ctx.globalCompositeOperation = "source-over";
         ctx.fillStyle = obj.color;
         ctx.beginPath();
         if (obj.shape === "rectangle") {
@@ -105,7 +115,7 @@ export default function Home() {
           ctx.fill();
         }
       }
-      // Draw selection
+      // Draw selection and resize handles
       if (selected === idx) {
         ctx.globalAlpha = 1;
         ctx.setLineDash([5, 5]);
@@ -130,6 +140,21 @@ export default function Home() {
         }
         ctx.strokeRect(x, y, w, h);
         ctx.setLineDash([]);
+
+        // Draw resize handles for shapes
+        if (obj.type === "shape") {
+          const handleSize = 10;
+          const corners = [
+            [obj.x, obj.y],
+            [obj.x + obj.w, obj.y],
+            [obj.x, obj.y + obj.h],
+            [obj.x + obj.w, obj.y + obj.h],
+          ];
+          ctx.fillStyle = "#0d6efd";
+          corners.forEach(([hx, hy]) => {
+            ctx.fillRect(hx - handleSize / 2, hy - handleSize / 2, handleSize, handleSize);
+          });
+        }
       }
     });
   }, [objects, selected, tool]);
@@ -188,6 +213,26 @@ export default function Home() {
       setStart(pt);
       setDrawing(true);
 
+      // Check for resize handle if select tool and shape selected
+      if (tool === "select" && selected !== null && objects[selected]?.type === "shape") {
+        const obj = objects[selected] as ShapeObj;
+        const handleSize = 10;
+        const corners = [
+          [obj.x, obj.y],
+          [obj.x + obj.w, obj.y],
+          [obj.x, obj.y + obj.h],
+          [obj.x + obj.w, obj.y + obj.h],
+        ];
+        for (let i = 0; i < corners.length; i++) {
+          const [x, y] = corners[i];
+          if (Math.abs(pt.x - x) < handleSize && Math.abs(pt.y - y) < handleSize) {
+            setResizeHandle(i);
+            setDrawing(true);
+            return;
+          }
+        }
+      }
+
       if (tool === "pencil" || tool === "eraser") {
         pushHistory([
           ...objects,
@@ -245,13 +290,49 @@ export default function Home() {
       }
       // eslint-disable-next-line
     },
-    [tool, color, size, opacity, shapeType, shapeW, shapeH, objects]
+    [tool, color, size, opacity, shapeType, shapeW, shapeH, objects, selected]
   );
 
   const handlePointerMove = useCallback(
     (e: React.MouseEvent | React.TouchEvent) => {
       if (!drawing) return;
       const pt = getPointerFromEvent(e);
+
+      // Resize shape if dragging a handle
+      if (resizeHandle !== null && selected !== null && objects[selected]?.type === "shape") {
+        setObjects((objs) => {
+          const newObjs = [...objs];
+          const obj = { ...newObjs[selected] } as ShapeObj;
+          switch (resizeHandle) {
+            case 0: // top-left
+              obj.w += obj.x - pt.x;
+              obj.h += obj.y - pt.y;
+              obj.x = pt.x;
+              obj.y = pt.y;
+              break;
+            case 1: // top-right
+              obj.w = pt.x - obj.x;
+              obj.h += obj.y - pt.y;
+              obj.y = pt.y;
+              break;
+            case 2: // bottom-left
+              obj.w += obj.x - pt.x;
+              obj.x = pt.x;
+              obj.h = pt.y - obj.y;
+              break;
+            case 3: // bottom-right
+              obj.w = pt.x - obj.x;
+              obj.h = pt.y - obj.y;
+              break;
+          }
+          obj.w = Math.max(10, obj.w);
+          obj.h = Math.max(10, obj.h);
+          newObjs[selected] = obj;
+          return newObjs;
+        });
+        return;
+      }
+
       if (tool === "pencil" || tool === "eraser") {
         setObjects((objs) => {
           const newObjs = [...objs];
@@ -262,6 +343,34 @@ export default function Home() {
           }
           return newObjs;
         });
+        // Live preview on canvas (optional)
+        const canvas = canvasRef.current;
+        if (canvas) {
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.save();
+            ctx.globalAlpha = opacity;
+            ctx.lineWidth = size;
+            ctx.lineCap = "round";
+            if (tool === "eraser") {
+              ctx.globalCompositeOperation = "destination-out";
+              ctx.strokeStyle = "rgba(0,0,0,1)";
+            } else {
+              ctx.globalCompositeOperation = "source-over";
+              ctx.strokeStyle = color;
+            }
+            ctx.beginPath();
+            const newObjs = [...objects];
+            const obj = newObjs[newObjs.length - 1] as PathObj;
+            if (obj && obj.points && obj.points.length > 0) {
+              const prev = obj.points[obj.points.length - 1];
+              ctx.moveTo(prev.x, prev.y);
+              ctx.lineTo(pt.x, pt.y);
+              ctx.stroke();
+            }
+            ctx.restore();
+          }
+        }
       } else if (tool === "select" && selected !== null) {
         setObjects((objs) => {
           const newObjs = [...objs];
@@ -282,11 +391,12 @@ export default function Home() {
       }
       // eslint-disable-next-line
     },
-    [drawing, tool, selected, start]
+    [drawing, tool, selected, start, color, opacity, size, objects, resizeHandle]
   );
 
   const handlePointerUp = useCallback(() => {
     setDrawing(false);
+    setResizeHandle(null);
   }, []);
 
   // Undo/Redo/Clear/Export/Delete/Layer
@@ -567,12 +677,3 @@ export default function Home() {
     </ButtonSoundContext.Provider>
   );
 }
-// ...existing code...
-<button
-  style={{ background: tool === "pencil" ? "#0d6efd" : undefined, display: "flex", alignItems: "center", gap: 4 }}
-  onClick={() => setTool("pencil")}
->
-  <span style={{ fontSize: 18, marginRight: 4 }}>✏️</span>
-  Pencil
-</button>
-// ...existing code...
